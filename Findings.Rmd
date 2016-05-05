@@ -1,0 +1,85 @@
+---
+title: "Findings.Rmd"
+author: "Thomas La Piana"
+date: "May 5, 2016"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+require(data.table)
+require(dplyr)
+```  
+# A Look at the Most Damaging Types of Weather by Human Harm and Economic Damage  
+#### This study looks at the total damage done by different types of weather as categorized by the U.S. National Oceanic and Atmospheric Administration (NOAA). When breaking down the data by types of damage (economic vs. human) and types of weather we are able to see trends and more properly plan for extreme weather.  
+## Data Processing  
+#### To prepare the data for proper analysis, we need to cut out some of the noise and decide which columns are relevant to the questions we are trying to answer. This section requires the packages 'data.table' and 'dplyr', both of which have been silently loaded. In order to get only the data we want, we are going to load in the data using the read.csv() function wrapped in data.table() for higher performance. Then, using the dplyr package we will create two different data sets, one focusing on weather types and human harm and a second focusing on weather types and economic damage.  
+```{r}
+## First lets load in the data set and take a look at it
+raw_storm_data = data.table(read.csv('repdata-data-StormData.csv'))
+head(raw_storm_data)
+```  
+#### After calling head() we can see that many of these columns are going to be useless to us. Let's go ahead and create our two datasets using only the columns that we think will be useful for our analysis. The dplyr pipe feature will allow us to concisely trim these data sets down to exactly what we need to plot our findings.
+```{r}
+## Reform the data set to answer questions about population health as a result of storms
+harmful_weather = raw_storm_data %>% 
+    select(EVTYPE,FATALITIES,INJURIES) %>% 
+    group_by(EVTYPE) %>% 
+    summarise_each(funs(sum)) %>% 
+    mutate(Human_Harm = FATALITIES + INJURIES) %>%
+    arrange(desc(Human_Harm))
+
+## Reform the data set to answer questions about economic damage as a result of storms
+damaging_weather = raw_storm_data %>% 
+    select(EVTYPE,PROPDMG,CROPDMG) %>% 
+    group_by(EVTYPE) %>% 
+    summarise_each(funs(sum)) %>% 
+    mutate(Total_Damage = PROPDMG + CROPDMG) %>%
+    arrange(desc(Total_Damage))
+
+print(head(harmful_weather))
+print(head(damaging_weather))
+```  
+#### Now that we have performed simple dimensionality reduction, lets go ahead and grab just the top ten most damaging/harmful weather types to work with for the results section.   
+```{r}
+most_harmful = head(select(harmful_weather,EVTYPE,Human_Harm),10)
+most_damaging = head(select(damaging_weather,EVTYPE,Total_Damage),10)
+```  
+#### Now that our data is clean, concise and meaningful, lets get into the results and plot out our findings.  
+##Results  
+#### The first question that we are trying to answer is which types of weather are most harmful to humans. To get a good idea, lets make two barplots. When we looked at the data earlier, you can see there are some pretty huge differences between even the top weather types, so to make it more understandable we'll plot both a scaled and an unscaled version of the findings. 
+```{r}
+## Create a two-row column for the plots
+par(mfrow=c(2,1))
+
+## Plot the scaled barplot
+with(most_harmful,
+     barplot(Human_Harm, names = EVTYPE,log='y',
+             main = 'Sum of humans injured or killed by Weather Type',
+             xlab = 'Weather Type',
+             ylab = 'People Injured of Killed (Log Scaled)'))
+
+## Plot the unscaled barplot
+with(most_harmful,
+     barplot(Human_Harm, names = EVTYPE,
+             main = 'Sum of humans injured or killed by Weather Type',
+             xlab = 'Weather Type',
+             ylab = 'People Injured of Killed'))
+
+print(most_harmful)
+```
+#### As you can see, tornadoes are far and away the most dangerous types of weather for humans, this is incredibly apparent in both graphcs, but especially so in the unscaled plot. Looking at the printout of the most harmful weather types, we can see exactly which weather types we need to watch out for to protect human life as much as possible.  
+#### Now let's go ahead and look at the findings for economic damage. Do you think we will see some of the same weather types show up again?  
+```{r}
+## Plot the findings showing human harm by type of weather (log scaled)
+with(most_damaging,
+     barplot(Total_Damage, names = EVTYPE,
+             main = 'Sum of economic damage by Weather Type',
+             xlab = 'Weather Type',
+             ylab = 'Damage done in Dollars $'))
+
+print(most_damaging)
+```
+#### As we can see here, tornadoes are still far and away the most damaging type of weather but in regards to economic damage it is much less drastic than before. Looking at the printout of most damaging, we can see the many of the same types of weather are also in this list. 
+## Findings
+#### Looking at the data, it is clear to see that there is a correlation between being a dangerous weather type for humans and also an economically destructive one. While some weather types, such as high wind and extreme heat don't show any correlation, they appear to be the exception and not the rule. 
